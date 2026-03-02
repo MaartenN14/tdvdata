@@ -1,0 +1,6 @@
+name: tdvdata
+dependencies:
+  - python=3.11
+  - pandas
+  - pyodbc
+  - pyarrow
