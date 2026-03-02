@@ -59,7 +59,7 @@ def main():
         print(f"{OUTPUT_DIR} does not exist. Run export_to_parquet.py first.")
         return
 
-    subfolders = sorted(d for d in OUTPUT_DIR.iterdir() if d.is_dir())
+    subfolders = sorted(d for d in OUTPUT_DIR.iterdir() if d.is_dir() and not d.name.startswith("."))
 
     if not subfolders:
         print(f"No subfolders found in {OUTPUT_DIR}. Run export_to_parquet.py first.")
@@ -75,20 +75,21 @@ def main():
         local_files = sorted(subdir.glob("*.parquet"))
 
         to_upload = [f for f in local_files if f.name not in remote]
-        to_skip   = [f for f in local_files if f.name in remote]
+        n_skipped = len(local_files) - len(to_upload)
 
         print(f"  Local: {len(local_files)} | Remote: {len(remote)} | "
-              f"To upload: {len(to_upload)} | To skip: {len(to_skip)}")
+              f"To upload: {len(to_upload)} | To skip: {n_skipped}")
 
-        for f in tqdm(to_upload, desc=f"  Uploading", unit="file", leave=False):
+        for f in tqdm(to_upload, desc="  Uploading", unit="file", leave=False):
             with open(f, "rb") as fh:
                 client.files.upload(f"{vol_dir}/{f.name}", fh, overwrite=False)
             tqdm.write(f"  UPLOADED : {f.name}")
 
-        for f in to_skip:
-            print(f"  SKIPPED  : {f.name} (already exists)")
+        for f in local_files:
+            if f.name in remote:
+                print(f"  SKIPPED  : {f.name} (already exists)")
 
-        print(f"  Done — {len(to_upload)} uploaded, {len(to_skip)} skipped.")
+        print(f"  Done — {len(to_upload)} uploaded, {n_skipped} skipped.")
 
 
 # =========================
