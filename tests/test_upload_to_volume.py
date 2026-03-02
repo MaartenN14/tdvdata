@@ -1,7 +1,10 @@
 from unittest.mock import MagicMock
 import pytest
 
-from upload_to_volume import get_remote_files, volume_dir_path
+from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import VolumeType
+
+from upload_to_volume import ensure_volume_exists, get_remote_files, volume_dir_path
 
 
 # ── get_remote_files ──────────────────────────────────────────────────────────
@@ -53,5 +56,32 @@ def test_get_remote_files_returns_empty_set_when_not_found():
 # ── volume_dir_path ───────────────────────────────────────────────────────────
 
 def test_volume_dir_path_builds_correct_path():
-    path = volume_dir_path("main", "default", "myvol", "performance_net")
-    assert path == "/Volumes/main/default/myvol/performance_net"
+    path = volume_dir_path("main", "default", "performance_net")
+    assert path == "/Volumes/main/default/performance_net"
+
+
+# ── ensure_volume_exists ──────────────────────────────────────────────────────
+
+def test_ensure_volume_exists_does_not_create_when_volume_exists():
+    """If volumes.read succeeds, volumes.create should NOT be called."""
+    client = MagicMock()
+
+    ensure_volume_exists(client, "main", "default", "perf")
+
+    client.volumes.read.assert_called_once_with("main.default.perf")
+    client.volumes.create.assert_not_called()
+
+
+def test_ensure_volume_exists_creates_volume_when_not_found():
+    """If volumes.read raises NotFound, volumes.create should be called."""
+    client = MagicMock()
+    client.volumes.read.side_effect = NotFound("not found")
+
+    ensure_volume_exists(client, "main", "default", "perf")
+
+    client.volumes.create.assert_called_once_with(
+        catalog_name="main",
+        schema_name="default",
+        name="perf",
+        volume_type=VolumeType.MANAGED,
+    )

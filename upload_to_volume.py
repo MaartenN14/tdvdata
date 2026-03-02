@@ -1,9 +1,10 @@
 """
-upload_to_volume.py — Upload local Parquet files from output/ to a UC Volume.
+upload_to_volume.py — Upload local Parquet files from output/ to UC Volumes.
 
 Run after export_to_parquet.py. For each subfolder in OUTPUT_DIR:
-  1. Lists files already in the matching Volume subfolder.
-  2. Uploads only files not already there — existing files are skipped.
+  1. Ensures a UC Volume with the same name as the subfolder exists (creates it if not).
+  2. Lists files already in the Volume.
+  3. Uploads only files not already there — existing files are skipped.
 
 Authentication uses the ~/.databrickscfg profile set in PROFILE.
 """
@@ -13,6 +14,7 @@ from pathlib import Path
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.errors import NotFound
+from databricks.sdk.service.catalog import VolumeType
 from tqdm import tqdm
 
 
@@ -22,7 +24,6 @@ from tqdm import tqdm
 PROFILE    = "DEV"          # ~/.databrickscfg profile name
 CATALOG    = "main"         # Unity Catalog catalog
 SCHEMA     = "default"      # Unity Catalog schema
-VOLUME     = "my_volume"    # UC Volume — must already exist
 OUTPUT_DIR = Path("output") # local root written by export_to_parquet.py
 # =========================
 
@@ -32,9 +33,24 @@ os.environ.setdefault("DATABRICKS_CONFIG_PROFILE", PROFILE)
 # =========================
 # === HELPERS
 # =========================
-def volume_dir_path(catalog: str, schema: str, volume: str, subfolder: str) -> str:
-    """Build the /Volumes/... path for a subfolder."""
-    return f"/Volumes/{catalog}/{schema}/{volume}/{subfolder}"
+def volume_dir_path(catalog: str, schema: str, subfolder: str) -> str:
+    """Build the /Volumes/... path for a subfolder (the subfolder is its own volume)."""
+    return f"/Volumes/{catalog}/{schema}/{subfolder}"
+
+
+def ensure_volume_exists(client: WorkspaceClient, catalog: str, schema: str, name: str) -> None:
+    """Create the UC Volume if it does not already exist."""
+    try:
+        client.volumes.read(f"{catalog}.{schema}.{name}")
+        print(f"  Volume exists: {name}")
+    except NotFound:
+        client.volumes.create(
+            catalog_name=catalog,
+            schema_name=schema,
+            name=name,
+            volume_type=VolumeType.MANAGED,
+        )
+        print(f"  Volume created: {name}")
 
 
 def get_remote_files(client: WorkspaceClient, volume_dir: str) -> set:
@@ -66,7 +82,8 @@ def main():
         return
 
     for subdir in subfolders:
-        vol_dir = volume_dir_path(CATALOG, SCHEMA, VOLUME, subdir.name)
+        ensure_volume_exists(client, CATALOG, SCHEMA, subdir.name)
+        vol_dir = volume_dir_path(CATALOG, SCHEMA, subdir.name)
 
         print(f"\n=== {subdir.name} ===")
         print(f"  Volume path : {vol_dir}")
