@@ -55,6 +55,10 @@ def get_remote_files(client: WorkspaceClient, volume_dir: str) -> set:
 def main():
     client = WorkspaceClient(profile=PROFILE)
 
+    if not OUTPUT_DIR.exists():
+        print(f"{OUTPUT_DIR} does not exist. Run export_to_parquet.py first.")
+        return
+
     subfolders = sorted(d for d in OUTPUT_DIR.iterdir() if d.is_dir())
 
     if not subfolders:
