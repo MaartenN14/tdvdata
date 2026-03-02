@@ -1,0 +1,11 @@
+# Output data
+output/
+*.parquet
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Conda
+.conda/
