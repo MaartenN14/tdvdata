@@ -4,3 +4,8 @@ dependencies:
   - pandas
   - pyodbc
   - pyarrow
+  - tqdm
+  - pip
+  - pip:
+    - databricks-sdk
+    - pytest
